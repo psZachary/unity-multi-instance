@@ -11,7 +11,7 @@ unity-multi-instance.exe <path to file>
 - MSVC >= v143
 
 ### Tested Working Versions
-- Unity 2022.3.62f1
+- [x] Unity 2022.3.62f1
 
 ### Roadmap
 - [ ] Add support for different Unity versions (likely requires pattern updates / RVA updates) 
