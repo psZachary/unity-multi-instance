@@ -10,76 +10,6 @@ static void print_usage() {
 	std::cout << "example: unity-multi-instance.exe \"RustClient.exe\"" << std::endl;
 }
 
-static bool get_process_id(const char* image_name, int* pid) {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE)
-        return false;
-
-    PROCESSENTRY32 pe{};
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(snapshot, &pe)) {
-        do {
-            if (_stricmp(_bstr_t(pe.szExeFile), image_name) == 0) { 
-                *pid = pe.th32ProcessID;
-                CloseHandle(snapshot);
-                return true;
-            }
-        } while (Process32Next(snapshot, &pe));
-    }
-
-    CloseHandle(snapshot);
-    return false;
-}
-
-static bool get_image_base(HANDLE handle , const wchar_t* name, uintptr_t* image_base)
-{
-    typedef struct _UNICODE_STRING {
-        USHORT len;
-        USHORT max_len;
-        PWSTR  buffer;
-    } UNICODE_STRING, * PUNICODE_STRING;
-
-    auto current = 0ull;
-    auto mbi = MEMORY_BASIC_INFORMATION();
-
-    while (VirtualQueryEx(handle, reinterpret_cast<void*>(current), &mbi, sizeof(MEMORY_BASIC_INFORMATION)))
-    {
-        if (mbi.Type == MEM_MAPPED || mbi.Type == MEM_IMAGE)
-        {
-            const auto buffer = malloc(1024);
-            size_t bytes{};
-
-            const static auto ntdll = GetModuleHandleA("ntdll");
-
-            const static auto nt_query_virtual_memory_fn =
-                reinterpret_cast<NTSTATUS(__stdcall*)(HANDLE, void*, std::int32_t, void*, std::size_t, std::size_t*)> (
-                    GetProcAddress(ntdll, "NtQueryVirtualMemory"));
-
-            if (nt_query_virtual_memory_fn(handle, mbi.BaseAddress, 2, buffer, 1024, &bytes) != 0 ||
-                !wcsstr(static_cast<UNICODE_STRING*>(buffer)->buffer, name) ||
-                wcsstr(static_cast<UNICODE_STRING*>(buffer)->buffer, L".mui"))
-            {
-
-                free(buffer);
-                goto skip;
-            }
-
-            free(buffer);
-            CloseHandle(handle);
-
-            *image_base = reinterpret_cast<uintptr_t>(mbi.BaseAddress);
-            return true;
-        }
-
-    skip:
-        current = reinterpret_cast<uintptr_t>(mbi.BaseAddress) + mbi.RegionSize;
-    }
-
-    CloseHandle(handle);
-    return false;
-}
-
 static bool rpm(HANDLE h, uintptr_t addr, void* out, SIZE_T size) {
     SIZE_T read = 0;
     return ReadProcessMemory(h, reinterpret_cast<LPCVOID>(addr), out, size, &read) && read == size;
@@ -248,7 +178,7 @@ static void on_unityplayer_load(HANDLE process, uintptr_t image_base) {
     std::cout << "instruction: " << patch_instruction << std::endl;
     
     // Skip other instance force close
-    char patch[1] = { 0xEB };
+    char patch[1] = { '\xEB' };
     // jz -> jmp
     wpm(process, patch_instruction, patch, sizeof(patch));
     std::cout << "patch 1 finished" << std::endl;
