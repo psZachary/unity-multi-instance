@@ -1,0 +1,19 @@
+# unity-multi-instance
+This tool allows you to launch multiple instances of a game client that is marked as `"single-instance"`
+
+### Usage
+```
+unity-multi-instance.exe <path to file>
+```
+
+### Requirements
+- Visual Studio 2022 with C++ Development Tools
+- MSVC >= v143
+
+### Tested Working Versions
+- [x] Unity 2022.3.62f1
+- [x] Unity 2022.3.41f1
+
+### Roadmap
+- [x] Add support Unity version checking
+- [ ] Add support for different Unity versions (likely requires pattern updates / RVA updates) 
