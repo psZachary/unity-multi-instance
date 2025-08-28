@@ -12,6 +12,8 @@ unity-multi-instance.exe <path to file>
 
 ### Tested Working Versions
 - [x] Unity 2022.3.62f1
+- [x] Unity 2022.3.41f1
 
 ### Roadmap
+- [x] Add support Unity version checking
 - [ ] Add support for different Unity versions (likely requires pattern updates / RVA updates) 
