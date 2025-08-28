@@ -12,8 +12,8 @@ const wchar_t* supported_unity_versions[128] = {
 };
 
 static void print_usage() {
-	std::cout << "usage: unity-multi-instance.exe <image name>" << std::endl;
-	std::cout << "example: unity-multi-instance.exe \"RustClient.exe\"" << std::endl;
+    std::cout << "usage: unity-multi-instance.exe <image name>" << std::endl;
+    std::cout << "example: unity-multi-instance.exe \"RustClient.exe\"" << std::endl;
 }
 
 static bool rpm(HANDLE h, uintptr_t addr, void* out, SIZE_T size) {
@@ -56,18 +56,18 @@ static bool get_image_section_info(HANDLE process, uintptr_t image_base, const c
     for (WORD i = 0; i < num_sections; ++i) {
         IMAGE_SECTION_HEADER sh{};
         const uintptr_t sh_addr = sections_addr + static_cast<uintptr_t>(i) * sizeof(IMAGE_SECTION_HEADER);
-        if (!rpm(process, sh_addr, &sh, sizeof(sh))) return 0; 
+        if (!rpm(process, sh_addr, &sh, sizeof(sh))) return 0;
 
         char name[9] = {};
         std::memcpy(name, sh.Name, 8);
-        
+
         if (std::strncmp(name, section_name, 8) == 0) {
             p_sinfo->base = image_base + static_cast<uintptr_t>(sh.VirtualAddress);
             p_sinfo->size = sh.Misc.VirtualSize;
             break;
         }
     }
-     
+
     return 1;
 }
 
@@ -83,36 +83,37 @@ static bool match_signature(const uint8_t* data, const char* sig) {
 }
 
 static uintptr_t sig_scan(HANDLE process, uintptr_t module_base, size_t size, const char* signature) {
-    constexpr size_t chunk_size = 0x10000;
-    size_t bytes_read = 0;
-
-    std::vector<uint8_t> buffer(chunk_size);
+    constexpr size_t    chunk_size = 0x10000;
+    size_t              bytes_read = 0;
+    uint8_t*            buffer = new uint8_t[chunk_size]{};
+    
 
     while (bytes_read < size) {
         size_t to_read = (size - bytes_read < chunk_size) ? (size - bytes_read) : chunk_size;
 
-        if (!rpm(process, module_base + bytes_read, buffer.data(), to_read))
-            return 0; 
+        if (!rpm(process, module_base + bytes_read, buffer, to_read))
+            return 0;
 
         for (size_t i = 0; i < to_read; i++) {
             if (match_signature(&buffer[i], signature)) {
-                return module_base + bytes_read + i; 
+                return module_base + bytes_read + i;
             }
         }
 
         bytes_read += to_read;
     }
 
-    return 0; 
+    delete[] buffer;
+    return 0;
 }
 
 using t_on_image_loaded = bool(*)(HANDLE h, uintptr_t, wchar_t* image_path);
 
 static bool wait_for_module_load(PROCESS_INFORMATION pi, const wchar_t* mod_name, t_on_image_loaded on_load) {
-    DEBUG_EVENT         dbg                         {};
-    uintptr_t           module_base                 = 0;
-    wchar_t             module_name[MAX_PATH]       {};
-    bool                found                       = false;
+    DEBUG_EVENT         dbg{};
+    uintptr_t           module_base = 0;
+    wchar_t             module_name[MAX_PATH]{};
+    bool                found = false;
 
     while (WaitForDebugEvent(&dbg, INFINITE)) {
         switch (dbg.dwDebugEventCode) {
@@ -126,10 +127,10 @@ static bool wait_for_module_load(PROCESS_INFORMATION pi, const wchar_t* mod_name
 
                 if (!rpm(pi.hProcess, (uintptr_t)ev.lpImageName, &remote_buffer, sizeof(remote_buffer)) || !remote_buffer)
                     return false;
-                
+
                 if (!rpm(pi.hProcess, (uintptr_t)remote_buffer, module_name, sizeof(module_name)))
                     return false;
-                
+
             }
 
             if (wcsstr(module_name, mod_name) != 0) {
@@ -142,7 +143,7 @@ static bool wait_for_module_load(PROCESS_INFORMATION pi, const wchar_t* mod_name
 
             if (ev.hFile)
                 CloseHandle(ev.hFile);
-                
+
             break;
         }
         default:
@@ -160,25 +161,25 @@ static bool wait_for_module_load(PROCESS_INFORMATION pi, const wchar_t* mod_name
     return true;
 }
 static bool get_product_version(const wchar_t* path, wchar_t** version) {
-    struct LANGANDCODEPAGE { WORD w_language; WORD w_codepage; };
-    LANGANDCODEPAGE* lp_translate = nullptr;
-    UINT cb_translate = 0;
-    uint8_t file_version_buffer[2048]{};
-    wchar_t blk_sub[50];
-    DWORD handle = 0;
-    DWORD size = 0;
-    wchar_t* value = nullptr;
-    UINT size_out = 0;
+    struct LANGANDCODEPAGE  { WORD w_language; WORD w_codepage; };
+    LANGANDCODEPAGE*        lp_translate = nullptr;
+    UINT                    cb_translate = 0;
+    uint8_t                 file_version_buffer[2048]{};
+    wchar_t                 blk_sub[50];
+    DWORD                   handle = 0;
+    DWORD                   size = 0;
+    wchar_t*                value = nullptr;
+    UINT                    size_out = 0;
 
     if (!path || !version)
         return false;
 
     size = GetFileVersionInfoSizeW(path, &handle);
-    if (size == 0) 
+    if (size == 0)
         return false;
 
     if (!GetFileVersionInfoW(path, 0, size, file_version_buffer))
-        return false;    
+        return false;
 
     if (!VerQueryValueW(file_version_buffer, L"\\VarFileInfo\\Translation",
         (LPVOID*)&lp_translate, &cb_translate))
@@ -186,7 +187,7 @@ static bool get_product_version(const wchar_t* path, wchar_t** version) {
 
     swprintf_s(blk_sub, L"\\StringFileInfo\\%04x%04x\\ProductVersion",
         lp_translate[0].w_language, lp_translate[0].w_codepage);
-    
+
     if (VerQueryValueW(file_version_buffer, blk_sub, (LPVOID*)version, &size_out))
     {
         return true;
@@ -209,7 +210,7 @@ bool split_string(const wchar_t* wstr, wchar_t delimiter, wchar_t* out, size_t i
 
         const wchar_t* start = p;
         while (*p && *p != delimiter)
-            ++p; 
+            ++p;
 
         if (cur == index) {
             size_t len = static_cast<size_t>(p - start);
@@ -224,8 +225,8 @@ bool split_string(const wchar_t* wstr, wchar_t delimiter, wchar_t* out, size_t i
 }
 
 static bool unityplayer_version_supported(const wchar_t* image_path, bool* supported, wchar_t* version) {
-    wchar_t delimited_product_version[128]{};
-    wchar_t* product_version = nullptr;
+    wchar_t     delimited_product_version[128]{};
+    wchar_t*    product_version = nullptr;
 
     if (!supported || !version || !image_path) return false;
 
@@ -261,10 +262,10 @@ static bool unityplayer_version_supported(const wchar_t* image_path, bool* suppo
 }
 
 static bool on_unityplayer_load(HANDLE process, uintptr_t image_base, wchar_t* image_path) {
-    section_info sinfo {};
-    uintptr_t patch_instruction = 0;
-    wchar_t unity_version[128]{};
-    bool version_supported = false;
+    section_info    sinfo{};
+    uintptr_t       patch_instruction = 0;
+    wchar_t         unity_version[128]{};
+    bool            version_supported = false;
 
     std::cout << "loaded unityplayer: " << std::hex << image_base << std::endl;
 
@@ -293,28 +294,28 @@ static bool on_unityplayer_load(HANDLE process, uintptr_t image_base, wchar_t* i
     std::cout << "text section base: " << sinfo.base << std::endl;
     std::cout << "text section size: " << sinfo.size << std::endl;
 
-    patch_instruction = sig_scan(process, sinfo.base, sinfo.size, "48 8B DF 48 89 1D ?? ?? ?? ?? 40 38 7D ?? 75 ?? 44 8B 45 ?? 48 8B 55 ?? 48 8B 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 1D ?? ?? ?? ?? 48 8B CB E8 ?? ?? ?? ?? 0F B6 F0 84 C0 74 ?? 48 8B CB E8 ?? ?? ?? ?? 84 C0 0F 84 ?? ?? ?? ?? 40 84 F6 0F 94 C3");
+    patch_instruction = sig_scan(process, sinfo.base, sinfo.size, "40 55 57 41 54 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 33 FF");
     if (!patch_instruction) {
         std::cout << "signature scan invalid: " << GetLastError() << std::endl;
         return false;
     }
-    patch_instruction += 0x38;
+    patch_instruction += 0x68A;
     std::cout << "instruction: " << patch_instruction << std::endl;
-    
+
     // Skip other instance force close
-    char patch[1] = { '\xEB' };
+    char patch_jmp[1] = { '\xEB' };
     // jz -> jmp
-    wpm(process, patch_instruction, patch, sizeof(patch));
-    std::cout << "patch 1 finished" << std::endl;
+    wpm(process, patch_instruction, patch_jmp, sizeof(patch_jmp));
+    std::cout << "patched jmp" << std::endl;
 
     patch_instruction = patch_instruction + 0x9E;
 
     // Parse CMD line = 1
     // xor eax, eax
     // inc eax
-    char patch2[4] = { '\x31', '\xC0', '\xFF', '\xC0' }; 
-    wpm(process, patch_instruction, patch2, sizeof(patch2));
-    std::cout << "patch 2 finished" << std::endl;
+    char patch_retn_value[4] = { '\x31', '\xC0', '\xFF', '\xC0' };
+    wpm(process, patch_instruction, patch_retn_value, sizeof(patch_retn_value));
+    std::cout << "patched retn value" << std::endl;
 
     std::cout << "finished patches returning to debug event" << std::endl;
 
@@ -322,17 +323,17 @@ static bool on_unityplayer_load(HANDLE process, uintptr_t image_base, wchar_t* i
 }
 
 int main(int argc, char** argv) {
-    char*               image_path                  = 0;
-    uintptr_t           image_base                  = 0;
-    STARTUPINFOA        si                          {};
-    PROCESS_INFORMATION pi                          {};
-    char                full_image_path[MAX_PATH]   {};
+    char*               image_path = 0;
+    uintptr_t           image_base = 0;
+    STARTUPINFOA        si{};
+    PROCESS_INFORMATION pi{};
+    char                full_image_path[MAX_PATH]{};
 
-	if (argc != 2)
-	{
-		print_usage(); 
-		return 1;
-	}
+    if (argc != 2)
+    {
+        print_usage();
+        return 1;
+    }
 
     image_path = argv[1];
 
@@ -353,9 +354,9 @@ int main(int argc, char** argv) {
         std::cout << "failed to wait for module load: " << GetLastError() << std::endl;
         return 4;
     }
-    
+
     std::cout << "done, execution resumed" << std::endl;
-    
+
     std::cout << "cleaning up..." << std::endl;
 
     CloseHandle(pi.hThread);
