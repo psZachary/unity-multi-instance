@@ -96,6 +96,7 @@ static uintptr_t sig_scan(HANDLE process, uintptr_t module_base, size_t size, co
 
         for (size_t i = 0; i < to_read; i++) {
             if (match_signature(&buffer[i], signature)) {
+                delete[] buffer;
                 return module_base + bytes_read + i;
             }
         }
